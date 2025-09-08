@@ -18,6 +18,8 @@ body {
   margin: auto;
   border-radius: 4px;
   border: 1px solid gray;
-  box-shadow: 0 0 10px 0px rgba(255, 255, 255, 0.5)
+  box-sizing: border-box;
+  box-shadow: 0 0 10px 0px rgba(255, 255, 255, 0.5);
+  max-width: 100%;
   /* transform: rotateY(180deg); */
 }

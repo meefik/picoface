@@ -24,11 +24,11 @@ function PICO(cascade, options) {
     scalefactor = 1.1,
     initialsize = 0.1,
     threshold = 0.2,
-    rotation = [0],
     memory = 1,
+    rotation = [0],
   } = options;
 
-  const classifier = unpackCascade(new Int8Array(cascade));
+  const runCascade = unpackCascade(new Int8Array(cascade));
   const memoryUpdater = getMemoryUpdater(memory);
 
   /**
@@ -41,16 +41,7 @@ function PICO(cascade, options) {
   function detect(image) {
     const { data, width, height } = image;
     const pixels = grayscale(data);
-    const dets = runCascade(
-      pixels,
-      width,
-      height,
-      classifier,
-      shiftfactor,
-      scalefactor,
-      initialsize,
-      rotation,
-    );
+    const dets = runCascade(pixels, width, height);
     return clusterDetections(memoryUpdater(dets), threshold);
   }
 
@@ -104,85 +95,90 @@ function PICO(cascade, options) {
       qsintable[i] = (Math.sin(a) * 256) | 0;
     }
     // construct the classification function from the read data
-    function classifyRegion(r, c, a, s, pixels, ldim) {
-      r = r << 16; // r * 65536
-      c = c << 16; // c * 65536
-      a = a | 0;
-      const qsin = s * qsintable[a]; // s*(int)(256.0f*sinf(2*M_PI*a));
-      const qcos = s * qcostable[a]; // s*(int)(256.0f*cosf(2*M_PI*a));
-      let o = 0.0;
-      for (let i = 0; i < ntrees; ++i) {
-        let idx = 1;
-        for (let j = 0; j < tdepth; ++j) {
-          const n = 4 * (pow2tdepth * i + idx);
-          const t0 = tcodes[n + 0];
-          const t1 = tcodes[n + 1];
-          const t2 = tcodes[n + 2];
-          const t3 = tcodes[n + 3];
-          // let r1 = (r + tcodes[n + 0] * s) >> 8; // (r+tcodes[4*idx+0]*s)/256
-          const r1 = (r + qcos * t0 - qsin * t1) >> 16; // (r + qcos*tcodes[4*idx+0] - qsin*tcodes[4*idx+1])/65536
-          // let c1 = (c + tcodes[n + 1] * s) >> 8; // (c+tcodes[4*idx+1]*s)/256
-          const c1 = (c + qsin * t0 + qcos * t1) >> 16; // (c + qsin*tcodes[4*idx+0] + qcos*tcodes[4*idx+1])/65536
-          // let r2 = (r + tcodes[n + 2] * s) >> 8; // (r+tcodes[4*idx+2]*s)/256
-          const r2 = (r + qcos * t2 - qsin * t3) >> 16; // (r + qcos*tcodes[4*idx+2] - qsin*tcodes[4*idx+3])/65536
-          // let c2 = (c + tcodes[n + 3] * s) >> 8; // (c+tcodes[4*idx+3]*s)/256
-          const c2 = (c + qsin * t2 + qcos * t3) >> 16; // (c + qsin*tcodes[4*idx+2] + qcos*tcodes[4*idx+3])/65536
-          const p1 = pixels[r1 * ldim + c1] | 0;
-          const p2 = pixels[r2 * ldim + c2] | 0;
-          idx = 2 * idx + (p1 <= p2 ? 1 : 0);
+    function runCascade(pixels, width, height) {
+      const detections = [];
+      const minsize = (initialsize * Math.sqrt(width * height)) | 0;
+      const nrotations = rotation.length;
+      let s = Math.min(width, height) | 0;
+      while (s >= minsize) {
+        const step = (shiftfactor * s + 1) | 0;
+        const offset = (s / 2 + 1) | 0;
+        const angles = new Array(nrotations);
+        for (let k = 0; k < nrotations; ++k) {
+          // rotation angle
+          const a = rotation[k];
+          // compute qcos/qsin once for this scale/angle
+          const qsin = s * qsintable[a];
+          const qcos = s * qcostable[a];
+          // we will build an Int32Array with 4 int offsets per node:
+          // [dr1, dc1, dr2, dc2] per (tree, nodeIndex)
+          // number of nodes per tree = pow2tdepth (we keep full pow2tdepth entries, idx starting at 0)
+          const nodesPerTree = pow2tdepth;
+          const offsets = new Int32Array(ntrees * nodesPerTree * 4);
+          // precompute offsets for all trees and all nodes
+          for (let t = 0; t < ntrees; ++t) {
+            const baseNode = t * nodesPerTree * 4;
+            for (let idx = 0; idx < nodesPerTree; ++idx) {
+              const n = 4 * (pow2tdepth * t + idx);
+              const t0 = tcodes[n + 0];
+              const t1 = tcodes[n + 1];
+              const t2 = tcodes[n + 2];
+              const t3 = tcodes[n + 3];
+              // precompute integer offsets (these correspond to the >>16 shifts in original code)
+              offsets[baseNode + idx * 4 + 0] = ((qcos * t0 - qsin * t1) >> 16);
+              offsets[baseNode + idx * 4 + 1] = ((qsin * t0 + qcos * t1) >> 16);
+              offsets[baseNode + idx * 4 + 2] = ((qcos * t2 - qsin * t3) >> 16);
+              offsets[baseNode + idx * 4 + 3] = ((qsin * t2 + qcos * t3) >> 16);
+            }
+          }
+          // store the offsets for this angle
+          angles[k] = offsets;
         }
-        o += tpreds[pow2tdepth * (i - 1) + idx];
-        if (o <= thresh[i]) return -1;
-      }
-      return o - thresh[ntrees - 1];
-    }
-    return classifyRegion;
-  }
+        // slide the detection window over the image
+        for (let r = offset; r < height - offset; r += step) {
+          for (let c = offset; c < width - offset; c += step) {
+            const rr = r << 16; // r * 65536
+            const cc = c << 16; // c * 65536
+            // evaluate the classifier for each rotation
+            for (let k = 0; k < nrotations; ++k) {
+              const a = rotation[k];
+              const offsets = angles[k];
+              let o = 0;
+              for (let i = 0; i < ntrees; ++i) {
+                let idx = 1;
+                const baseNode = i * pow2tdepth * 4;
+                for (let j = 0; j < tdepth; ++j) {
+                  const offIndex = baseNode + idx * 4;
+                  const r1 = (rr >> 16) + offsets[offIndex + 0];
+                  const c1 = (cc >> 16) + offsets[offIndex + 1];
+                  const r2 = (rr >> 16) + offsets[offIndex + 2];
+                  const c2 = (cc >> 16) + offsets[offIndex + 3];
 
-  /**
-   * Run cascade and get detections.
-   *
-   * @param {number[]} pixels The grayscale pixels in a linear array.
-   * @param {number} width The image width.
-   * @param {number} height The image height.
-   * @param {function} clfn The classification function from unpackCascade().
-   * @param {number} shiftfactor How much to rescale the window during the multiscale detection process.
-   * @param {number} scalefactor How much to move the window between neighboring detections.
-   * @param {number} initialsize Minimum face size relative to the area of the image.
-   * @param {number|number[]} rotation Angles of rotation in degrees.
-   * @return {number[][]} Data of detections.
-   */
-  function runCascade(
-    pixels,
-    width,
-    height,
-    classifier,
-    shiftfactor,
-    scalefactor,
-    initialsize,
-    rotation,
-  ) {
-    const detections = [];
-    const rl = rotation.length;
-    const minsize = (initialsize * Math.sqrt(width * height)) | 0;
-    let s = Math.min(width, height) | 0;
-    while (s >= minsize) {
-      const step = (shiftfactor * s + 1) | 0;
-      const offset = (s / 2 + 1) | 0;
-      for (let r = offset; r < height - offset; r += step) {
-        for (let c = offset; c < width - offset; c += step) {
-          for (let i = 0; i < rl; i++) {
-            const a = rotation[i];
-            const q = classifier(r, c, a, s, pixels, width);
-            if (q > 0) {
-              detections.push([r, c, s, q, a]);
+                  const p1 = pixels[r1 * width + c1] | 0;
+                  const p2 = pixels[r2 * width + c2] | 0;
+                  idx = 2 * idx + (p1 <= p2 ? 1 : 0);
+                }
+                o += tpreds[pow2tdepth * (i - 1) + idx];
+                if (o <= thresh[i]) {
+                  o = 0;
+                  break;
+                }
+              }
+              // check the detection score
+              if (o > 0) {
+                const q = o - thresh[ntrees - 1];
+                if (q > 0) {
+                  detections.push([r, c, s, q, a]);
+                }
+              }
             }
           }
         }
+        s = (s / scalefactor) | 0;
       }
-      s = (s / scalefactor) | 0;
+      return detections;
     }
-    return detections;
+    return runCascade;
   }
 
   /**
