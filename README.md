@@ -3,6 +3,8 @@
 A small JavaScript library for detecting faces using the [PICO](https://arxiv.org/abs/1305.4537)
 algorithm with the face rotation invariant implementation.
 
+[![DEMO](https://img.youtube.com/vi/u38oQQMu0WU/0.jpg)](https://www.youtube.com/watch?v=u38oQQMu0WU)
+
 ## Usage
 
 An example of using the basic functions of the library:
@@ -70,8 +72,6 @@ Start the demo webserver:
 ```
 npm run dev
 ```
-
-[![Video](https://img.youtube.com/vi/u38oQQMu0WU/0.jpg)](https://www.youtube.com/watch?v=u38oQQMu0WU)
 
 ## Related projects
 

@@ -9,6 +9,7 @@
     "url": "https://github.com/meefik/picoface.git"
   },
   "main": "src/index.js",
+  "types": "types/index.d.ts",
   "module": "dist/picoface.esm.js",
   "unpkg": "dist/picoface.umd.js",
   "type": "module",

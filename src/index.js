@@ -1,24 +1,20 @@
 /**
- * Face detection using the PICO algorithm with the face rotation
- * invariant implementation.
+ * Constructs a face detector using the PICO algorithm with rotation invariance.
  *
- * Paper: https://arxiv.org/abs/1305.4537
- * Source code: https://github.com/meefik/picojs
- */
-
-/**
- * PICO constructor.
+ * Reference: https://arxiv.org/abs/1305.4537
+ * Source: https://github.com/meefik/picoface
  *
- * @param {number[]} cascade Classification cascade.
- * @param {Object} [options] Algorithm options.
- * @param {number} [options.shiftfactor=0.1] Move the detection window by 10% of its size.
- * @param {number} [options.scalefactor=1.1] For multiscale processing: resize the detection window by 10% when moving to the higher scale.
- * @param {number} [options.initialsize=0.1] Minimum size of a face (10% of image area).
- * @param {number} [options.threshold=0.2] Overlap threshold.
- * @param {number} [options.memory=1] Number of images in the memory.
- * @param {number[]} [options.rotation=[0]] Angles of rotation in degrees.
+ * @param {number[]} cascade - Classification cascade data.
+ * @param {Object} [options] - Algorithm options.
+ * @param {number} [options.shiftfactor=0.1] - Step size as a fraction of window size.
+ * @param {number} [options.scalefactor=1.1] - Scale reduction factor per iteration.
+ * @param {number} [options.initialsize=0.1] - Minimum face size as a fraction of image area.
+ * @param {number} [options.threshold=0.2] - Overlap threshold for clustering.
+ * @param {number} [options.memory=1] - Number of frames to keep in memory for smoothing.
+ * @param {number[]} [options.rotation=[0]] - Array of rotation angles (degrees).
+ * @returns {function} Detector function.
  */
-function PICO(cascade, options) {
+function createDetector(cascade, options) {
   const {
     shiftfactor = 0.1,
     scalefactor = 1.1,
@@ -32,11 +28,11 @@ function PICO(cascade, options) {
   const memoryUpdater = getMemoryUpdater(memory);
 
   /**
-   * Detect face in the image.
+   * Detects faces in the image.
    *
-   * @param {ImageData} image Data of image.
-   * @return {Object[]}
-   * r - row, c - col, s - size, q - quality, a - angle in degrees
+   * @param {ImageData} image - Image data.
+   * @returns {Object[]} Array of detected faces with properties:
+   *   r - row, c - col, s - size, q - quality, a - angle (degrees)
    */
   function detect(image) {
     const { data, width, height } = image;
@@ -46,10 +42,10 @@ function PICO(cascade, options) {
   }
 
   /**
-   * Extract data from the cascade binary.
+   * Unpacks cascade binary data and returns a classifier function.
    *
-   * @param {Int8Array} bytes Cascade binary data.
-   * @return {function}
+   * @param {Int8Array} bytes - Cascade binary data.
+   * @returns {function} Cascade classifier function.
    */
   function unpackCascade(bytes) {
     // use a DataView directly over the Int8Array buffer for fast reads
@@ -94,7 +90,15 @@ function PICO(cascade, options) {
       qcostable[i] = (Math.cos(a) * 256) | 0;
       qsintable[i] = (Math.sin(a) * 256) | 0;
     }
-    // construct the classification function from the read data
+
+    /**
+     * Runs the cascade classifier over the image at multiple scales and rotations.
+     *
+     * @param {Uint8ClampedArray} pixels - Grayscale image pixels.
+     * @param {number} width - Image width.
+     * @param {number} height - Image height.
+     * @returns {Array} Raw detection results.
+     */
     function runCascade(pixels, width, height) {
       const detections = [];
       const minsize = (initialsize * Math.sqrt(width * height)) | 0;
@@ -178,14 +182,16 @@ function PICO(cascade, options) {
       }
       return detections;
     }
+
     return runCascade;
   }
 
   /**
-   * Calculates the intersection over union for two detections.
+   * Calculates intersection over union (IoU) for two detections.
    *
-   * @param {number[]} det1
-   * @param {number[]} det2
+   * @param {number[]} det1 - First detection.
+   * @param {number[]} det2 - Second detection.
+   * @returns {number} IoU value.
    */
   function calcOverlap(det1, det2) {
     // unpack the position and size of each detection
@@ -207,10 +213,11 @@ function PICO(cascade, options) {
   }
 
   /**
-   * Clustering the array of detection.
+   * Clusters overlapping detections using non-maximum suppression.
    *
-   * @param {number[]} det
-   * @param {number} threshold
+   * @param {number[]} dets - Array of detections.
+   * @param {number} threshold - Overlap threshold.
+   * @returns {Object[]} Clustered detections.
    */
   function clusterDetections(dets, threshold) {
     // sort detections by their quality
@@ -252,10 +259,10 @@ function PICO(cascade, options) {
   }
 
   /**
-   * Get function for updating images in the memory.
+   * Returns a function to update and merge detections from multiple frames.
    *
-   * @param {number} size Size of the memory.
-   * @return {function}
+   * @param {number} size - Number of frames to keep in memory.
+   * @returns {function} Memory updater function.
    */
   function getMemoryUpdater(size) {
     // initialize a circular buffer of `size` elements
@@ -280,18 +287,14 @@ function PICO(cascade, options) {
   }
 
   /**
-   * Converts a color from a color-space based on an RGB color model to a
-   * grayscale representation of its luminance. The coefficients represent the
-   * measured intensity perception of typical trichromat humans, in
-   * particular, human vision is most sensitive to green and least sensitive
-   * to blue.
+   * Converts RGBA image data to grayscale luminance values.
+   * Uses REC/BT.709 weights for human visual sensitivity.
+   *
    * The source code from tracking.js: https://github.com/eduardolundgren/tracking.js
    *
-   * @param {Uint8Array|Uint8ClampedArray|Array} pixels The pixels in a linear [r,g,b,a,...] array.
-   * @param {boolean} fillRGBA If the result should fill all RGBA values with the gray scale
-   *  values, instead of returning a single value per pixel.
-   * @return {Uint8ClampedArray} The grayscale pixels in a linear array ([p,p,p,a,...] if fillRGBA
-   *  is true and [p1, p2, p3, ...] if fillRGBA is false).
+   * @param {Uint8Array|Uint8ClampedArray|Array} pixels - RGBA pixel array.
+   * @param {boolean} fillRGBA - If true, fills all RGBA values with grayscale; otherwise, returns one value per pixel.
+   * @returns {Uint8ClampedArray} Grayscale pixel array.
    */
   function grayscale(pixels, fillRGBA) {
     /*
@@ -344,16 +347,16 @@ function PICO(cascade, options) {
 }
 
 /**
- * Create detector function.
+ * Creates a detector function using a Web Worker for asynchronous face detection.
  *
- * @param {number[]} cascade Classification cascade.
- * @param {Object} [options] Algorithm options.
- * @return {function} Detector function.
+ * @param {number[]} cascade - Classification cascade data.
+ * @param {Object} [options] - Algorithm options.
+ * @returns {function} Asynchronous detector function.
  */
-export default function (cascade, options) {
+export default function PicoFace(cascade, options) {
   // create worker
-  const fnString = `(function(){${PICO.toString()};var detect=${
-    PICO.name
+  const fnString = `(function(){${createDetector.toString()};var detect=${
+    createDetector.name
   }([${new Int8Array(cascade).toString()}],${JSON.stringify(
     options || {},
   )});onmessage=function(e){postMessage(detect(e.data));};})();`;
