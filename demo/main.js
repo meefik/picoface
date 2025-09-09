@@ -1,4 +1,4 @@
-import PICO from '../src/index.js';
+import PicoFace from '../src/index.js';
 
 let detect, rects, time;
 const canvas = document.getElementById('canvas');
@@ -87,8 +87,8 @@ fetch('/data/classifier.dat')
     return response.arrayBuffer();
   })
   .then(function (cascade) {
-    // create PICO instance without options
-    detect = PICO(cascade, { rotation: [0, 30, 330], memory: 3 });
+    // create the face detector with options
+    detect = PicoFace(cascade, { rotation: [0, 30, 330], memory: 3 });
     // capture video from webcam
     return navigator.mediaDevices.getUserMedia({
       video: {

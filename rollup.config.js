@@ -5,11 +5,11 @@ const { NODE_ENV = 'production' } = process.env;
 export default {
   input: 'src/index.js',
   output: [{
-    file: 'dist/pico.umd.js',
+    file: 'dist/picoface.umd.js',
     format: 'umd',
-    name: 'PICO',
+    name: 'PicoFace',
   }, {
-    file: 'dist/pico.esm.js',
+    file: 'dist/picoface.esm.js',
     format: 'esm',
   }],
   plugins: NODE_ENV === 'production' ? [terser()] : [],
