@@ -1,6 +1,6 @@
 {
   "name": "picoface",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "A small JavaScript library for detecting faces using the PICO algorithm",
   "author": "Anton Skshidlevsky <meefik@gmail.com>",
   "license": "MIT",
@@ -8,6 +8,10 @@
     "type": "git",
     "url": "https://github.com/meefik/picoface.git"
   },
+  "keywords": [
+    "face-detection",
+    "pico"
+  ],
   "main": "src/index.js",
   "types": "types/index.d.ts",
   "module": "dist/picoface.esm.js",
