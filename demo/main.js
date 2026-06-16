@@ -1,9 +1,9 @@
-import PicoFace from '../src/index.js';
+import PicoFace from "../src/index.js";
 
 let detect, rects, time;
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d', { willReadFrequently: true });
-const video = document.createElement('video');
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d", { willReadFrequently: true });
+const video = document.createElement("video");
 // detection loop
 function loop() {
   const width = video.videoWidth;
@@ -25,10 +25,10 @@ function loop() {
 function drawRects(rects, time) {
   if (!rects) return;
   // overlay time
-  ctx.fillStyle = 'rgba(127,127,127,0.5)';
+  ctx.fillStyle = "rgba(127,127,127,0.5)";
   ctx.fillRect(0, 0, 120, 28);
-  ctx.fillStyle = 'white';
-  ctx.font = '12px monospace';
+  ctx.fillStyle = "white";
+  ctx.font = "12px monospace";
   ctx.fillText(`${~~(1000 / time)} fps, ${time} ms`, 10, 18);
   // draw detection rects
   for (let i = 0; i < rects.length; ++i) {
@@ -44,7 +44,7 @@ function drawRects(rects, time) {
     if (color < 0) color = 0;
     if (color > 100) color = 100;
     if (quality > threshold) {
-    // first save the untranslated/unrotated ctx
+      // first save the untranslated/unrotated ctx
       ctx.save();
       ctx.beginPath();
       // move the rotation point to the center of the rect
@@ -55,7 +55,7 @@ function drawRects(rects, time) {
       // Note: after transforming [0,0] is visually [x,y]
       //       so the rect needs to be offset accordingly when drawn
       ctx.rect(-size / 2, -size / 2, size, size);
-      ctx.strokeStyle = 'hsl(' + color + ',50%,50%)';
+      ctx.strokeStyle = "hsl(" + color + ",50%,50%)";
       ctx.lineWidth = 3;
       ctx.stroke();
       // draw top line
@@ -63,27 +63,27 @@ function drawRects(rects, time) {
       ctx.moveTo(-size / 2, -size / 2);
       ctx.lineTo(size / 2, -size / 2);
       ctx.lineWidth = 3;
-      ctx.strokeStyle = 'blue';
+      ctx.strokeStyle = "blue";
       ctx.stroke();
       // restore the ctx to its untranslated/unrotated state
       ctx.restore();
       // draw labels
-      ctx.fillStyle = 'rgba(127,127,127,0.5)';
+      ctx.fillStyle = "rgba(127,127,127,0.5)";
       ctx.fillRect(x + size + 5, y, 60, 85);
-      ctx.fillStyle = 'white';
-      ctx.font = '12px monospace';
-      ctx.fillText('x=' + x, x + size + 10, y + 15);
-      ctx.fillText('y=' + y, x + size + 10, y + 30);
-      ctx.fillText('s=' + size, x + size + 10, y + 45);
-      ctx.fillText('a=' + angle, x + size + 10, y + 60);
-      ctx.fillText('q=' + ~~(quality), x + size + 10, y + 75);
+      ctx.fillStyle = "white";
+      ctx.font = "12px monospace";
+      ctx.fillText("x=" + x, x + size + 10, y + 15);
+      ctx.fillText("y=" + y, x + size + 10, y + 30);
+      ctx.fillText("s=" + size, x + size + 10, y + 45);
+      ctx.fillText("a=" + angle, x + size + 10, y + 60);
+      ctx.fillText("q=" + ~~quality, x + size + 10, y + 75);
     }
   }
 }
 // load cascade
-fetch('/data/classifier.dat')
+fetch("/data/classifier.dat")
   .then(function (response) {
-    if (!response.ok) throw Error(response.statusText || 'Request error');
+    if (!response.ok) throw Error(response.statusText || "Request error");
     return response.arrayBuffer();
   })
   .then(function (cascade) {
@@ -94,7 +94,7 @@ fetch('/data/classifier.dat')
       video: {
         width: { ideal: 640 },
         height: { ideal: 480 },
-        facingMode: { ideal: 'user' },
+        facingMode: { ideal: "user" },
       },
       audio: false,
     });

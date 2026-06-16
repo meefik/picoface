@@ -49,7 +49,11 @@ function createDetector(cascade, options) {
    */
   function unpackCascade(bytes) {
     // use a DataView directly over the Int8Array buffer for fast reads
-    const dview = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const dview = new DataView(
+      bytes.buffer,
+      bytes.byteOffset,
+      bytes.byteLength,
+    );
     // skip the first 8 bytes of the cascade file
     // (cascade version number and some data used during the learning process)
     let p = 8;
@@ -129,10 +133,10 @@ function createDetector(cascade, options) {
               const t2 = tcodes[n + 2];
               const t3 = tcodes[n + 3];
               // precompute integer offsets (these correspond to the >>16 shifts in original code)
-              offsets[baseNode + idx * 4 + 0] = ((qcos * t0 - qsin * t1) >> 16);
-              offsets[baseNode + idx * 4 + 1] = ((qsin * t0 + qcos * t1) >> 16);
-              offsets[baseNode + idx * 4 + 2] = ((qcos * t2 - qsin * t3) >> 16);
-              offsets[baseNode + idx * 4 + 3] = ((qsin * t2 + qcos * t3) >> 16);
+              offsets[baseNode + idx * 4 + 0] = (qcos * t0 - qsin * t1) >> 16;
+              offsets[baseNode + idx * 4 + 1] = (qsin * t0 + qcos * t1) >> 16;
+              offsets[baseNode + idx * 4 + 2] = (qcos * t2 - qsin * t3) >> 16;
+              offsets[baseNode + idx * 4 + 3] = (qsin * t2 + qcos * t3) >> 16;
             }
           }
           // store the offsets for this angle
@@ -333,9 +337,11 @@ function createDetector(cascade, options) {
       // But I'm using scaled integers here for speed (x 0xffff). This can be improved more using 2^n
       //   close to the factors allowing for shift-ops (i.e. 4732 -> 4096 => .. (c&0xff) << 12 .. etc.)
       //   if "accuracy" is not important (luma is anyway an visual approx.):
-      luma = (((c >>> 16) & 0xff) * 13933
-        + ((c >>> 8) & 0xff) * 46871
-        + (c & 0xff) * 4732) >>> 16;
+      luma =
+        (((c >>> 16) & 0xff) * 13933 +
+          ((c >>> 8) & 0xff) * 46871 +
+          (c & 0xff) * 4732) >>>
+        16;
       gray[i++] = fillRGBA ? (luma * 0x10101) | (c & 0xff000000) : luma;
     }
 
@@ -361,14 +367,14 @@ export default function PicoFace(cascade, options) {
     options || {},
   )});onmessage=function(e){postMessage(detect(e.data));};})();`;
   const workerBlob = new Blob([fnString], {
-    type: 'application/javascript',
+    type: "application/javascript",
   });
   const workerBlobURL = URL.createObjectURL(workerBlob);
   const worker = new Worker(workerBlobURL);
   // send data
   return function (data) {
     return new Promise((resolve) => {
-      worker.onmessage = e => resolve(e.data);
+      worker.onmessage = (e) => resolve(e.data);
       worker.postMessage(data);
     });
   };

@@ -36,5 +36,5 @@ export interface PicoFaceDetection {
  */
 export default function PicoFace(
   cascade: number[],
-  options?: PicoFaceOptions
+  options?: PicoFaceOptions,
 ): (image: ImageData) => Promise<PicoFaceDetection[]>;
