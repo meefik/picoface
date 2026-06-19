@@ -4,14 +4,14 @@
  * Reference: https://arxiv.org/abs/1305.4537
  * Source: https://github.com/meefik/picoface
  *
- * @param {number[]} cascade - Classification cascade data.
- * @param {Object} [options] - Algorithm options.
- * @param {number} [options.shiftfactor=0.1] - Step size as a fraction of window size.
- * @param {number} [options.scalefactor=1.1] - Scale reduction factor per iteration.
- * @param {number} [options.initialsize=0.1] - Minimum face size as a fraction of image area.
- * @param {number} [options.threshold=0.2] - Overlap threshold for clustering.
- * @param {number} [options.memory=1] - Number of frames to keep in memory for smoothing.
- * @param {number[]} [options.rotation=[0]] - Array of rotation angles (degrees).
+ * @param {number[]} cascade Classification cascade data.
+ * @param {Object} [options] Algorithm options.
+ * @param {number} [options.shiftfactor=0.1] Step size as a fraction of window size.
+ * @param {number} [options.scalefactor=1.1] Scale reduction factor per iteration.
+ * @param {number} [options.initialsize=0.1] Minimum face size as a fraction of image area.
+ * @param {number} [options.threshold=0.2] Overlap threshold for clustering.
+ * @param {number} [options.memory=1] Number of frames to keep in memory for smoothing.
+ * @param {number[]} [options.rotation=[0]] Array of rotation angles (degrees).
  * @returns {function} Detector function.
  */
 function createDetector(cascade, options) {
@@ -30,8 +30,8 @@ function createDetector(cascade, options) {
   /**
    * Detects faces in the image.
    *
-   * @param {ImageData} image - Image data.
-   * @returns {Object[]} Array of detected faces with properties:
+   * @param {ImageData} image Image data.
+   * @returns {{r: number, c: number, s: number, q: number, a: number}[]} Array of detected faces with properties:
    *   r - row, c - col, s - size, q - quality, a - angle (degrees)
    */
   function detect(image) {
@@ -44,7 +44,7 @@ function createDetector(cascade, options) {
   /**
    * Unpacks cascade binary data and returns a classifier function.
    *
-   * @param {Int8Array} bytes - Cascade binary data.
+   * @param {Int8Array} bytes Cascade binary data.
    * @returns {function} Cascade classifier function.
    */
   function unpackCascade(bytes) {
@@ -55,7 +55,7 @@ function createDetector(cascade, options) {
       bytes.byteLength,
     );
     // skip the first 8 bytes of the cascade file
-    // (cascade version number and some data used during the learning process)
+    // (cascade version number and metadata used during training)
     let p = 8;
     const tdepth = dview.getInt32(p, true);
     p += 4;
@@ -68,7 +68,7 @@ function createDetector(cascade, options) {
     const thresh = new Float32Array(ntrees);
     for (let t = 0; t < ntrees; ++t) {
       const base = t * 4 * pow2tdepth;
-      // first 4 values are zeros (kept for historical layout)
+      // first 4 values are zeros (retained for historical layout compatibility)
       tcodes[base + 0] = 0;
       tcodes[base + 1] = 0;
       tcodes[base + 2] = 0;
@@ -86,7 +86,7 @@ function createDetector(cascade, options) {
       thresh[t] = dview.getFloat32(p, true);
       p += 4;
     }
-    // cosinus and sinus tables (int) - using Int32Array is faster than pushing into JS arrays
+    // cosine and sine tables (integer Q16 fixed-point) — using Int32Array is faster than pushing into JS arrays
     const qcostable = new Int32Array(360);
     const qsintable = new Int32Array(360);
     for (let i = 0; i < 360; ++i) {
@@ -98,9 +98,9 @@ function createDetector(cascade, options) {
     /**
      * Runs the cascade classifier over the image at multiple scales and rotations.
      *
-     * @param {Uint8ClampedArray} pixels - Grayscale image pixels.
-     * @param {number} width - Image width.
-     * @param {number} height - Image height.
+     * @param {Uint8ClampedArray} pixels Grayscale image pixels.
+     * @param {number} width Image width.
+     * @param {number} height Image height.
      * @returns {Array} Raw detection results.
      */
     function runCascade(pixels, width, height) {
@@ -193,8 +193,8 @@ function createDetector(cascade, options) {
   /**
    * Calculates intersection over union (IoU) for two detections.
    *
-   * @param {number[]} det1 - First detection.
-   * @param {number[]} det2 - Second detection.
+   * @param {number[]} det1 First detection.
+   * @param {number[]} det2 Second detection.
    * @returns {number} IoU value.
    */
   function calcOverlap(det1, det2) {
@@ -219,9 +219,9 @@ function createDetector(cascade, options) {
   /**
    * Clusters overlapping detections using non-maximum suppression.
    *
-   * @param {number[]} dets - Array of detections.
-   * @param {number} threshold - Overlap threshold.
-   * @returns {Object[]} Clustered detections.
+   * @param {number[][]} dets Array of detections.
+   * @param {number} threshold Overlap threshold.
+   * @returns {{r: number, c: number, s: number, q: number, a: number}[]} Clustered detections.
    */
   function clusterDetections(dets, threshold) {
     // sort detections by their quality
@@ -265,19 +265,19 @@ function createDetector(cascade, options) {
   /**
    * Returns a function to update and merge detections from multiple frames.
    *
-   * @param {number} size - Number of frames to keep in memory.
+   * @param {number} capacity Number of frames to keep in memory.
    * @returns {function} Memory updater function.
    */
-  function getMemoryUpdater(size) {
-    // initialize a circular buffer of `size` elements
+  function getMemoryUpdater(capacity) {
+    // initialize a circular buffer with `capacity` slots
     let n = 0;
     const memory = [];
-    for (let i = 0; i < size; ++i) {
+    for (let i = 0; i < capacity; ++i) {
       memory.push([]);
     }
     // build a function that:
     // (1) inserts the current frame's detections into the buffer;
-    // (2) merges all detections from the last `size` frames and returns them
+    // (2) merges all detections from the last `capacity` frames and returns them
     function updateMemory(dets) {
       memory[n] = dets;
       n = (n + 1) % memory.length;
@@ -294,10 +294,10 @@ function createDetector(cascade, options) {
    * Converts RGBA image data to grayscale luminance values.
    * Uses REC/BT.709 weights for human visual sensitivity.
    *
-   * The source code from tracking.js: https://github.com/eduardolundgren/tracking.js
+   * Source: adapted from tracking.js — https://github.com/eduardolundgren/tracking.js
    *
-   * @param {Uint8Array|Uint8ClampedArray|Array} pixels - RGBA pixel array.
-   * @param {boolean} fillRGBA - If true, fills all RGBA values with grayscale; otherwise, returns one value per pixel.
+   * @param {Uint8Array|Uint8ClampedArray|Array} pixels RGBA pixel array.
+   * @param {boolean} fillRGBA If true, fills all RGBA values with grayscale; otherwise, returns one value per pixel.
    * @returns {Uint8ClampedArray} Grayscale pixel array.
    */
   function grayscale(pixels, fillRGBA) {
@@ -329,14 +329,14 @@ function createDetector(cascade, options) {
     let luma = 0;
 
     while (i < len) {
-      // Entire pixel in little-endian order (ABGR)
+      // Entire pixel in little-endian order (ABGR on little-endian systems)
       c = data32[i];
 
-      // Using the more up-to-date REC/BT.709 approx. weights for luma instead: [0.2126, 0.7152, 0.0722].
+      // Using the more up-to-date REC/BT.709 approximate weights for luma: [0.2126, 0.7152, 0.0722].
       //   luma = ((c>>>16 & 0xff) * 0.2126 + (c>>>8 & 0xff) * 0.7152 + (c & 0xff) * 0.0722 + 0.5)|0;
-      // But I'm using scaled integers here for speed (x 0xffff). This can be improved more using 2^n
-      //   close to the factors allowing for shift-ops (i.e. 4732 -> 4096 => .. (c&0xff) << 12 .. etc.)
-      //   if "accuracy" is not important (luma is anyway an visual approx.):
+      // But I'm using scaled integers here for speed (x 0xffff). This can be improved further using 2^n
+      //   values close to the factors, allowing shift operations (e.g. 4732 -> 4096 => .. (c&0xff) << 12 .. etc.)
+      //   if high accuracy is not required (luma is already a visual approximation):
       luma =
         (((c >>> 16) & 0xff) * 13933 +
           ((c >>> 8) & 0xff) * 46871 +
@@ -355,8 +355,8 @@ function createDetector(cascade, options) {
 /**
  * Creates a detector function using a Web Worker for asynchronous face detection.
  *
- * @param {number[]} cascade - Classification cascade data.
- * @param {Object} [options] - Algorithm options.
+ * @param {number[]} cascade Classification cascade data.
+ * @param {Object} [options] Algorithm options.
  * @returns {function} Asynchronous detector function.
  */
 export default function PicoFace(cascade, options) {

@@ -1,7 +1,7 @@
 # PICO Face Detector
 
-A small JavaScript library for detecting faces using the [PICO](https://arxiv.org/abs/1305.4537)
-algorithm with the face rotation invariant implementation.
+A JavaScript library for detecting faces using the [PICO](https://arxiv.org/abs/1305.4537)
+algorithm with rotation-invariant detection.
 
 [![DEMO](https://img.youtube.com/vi/u38oQQMu0WU/0.jpg)](https://www.youtube.com/watch?v=u38oQQMu0WU)
 
@@ -9,7 +9,7 @@ More details [here](https://meefik.dev/2018/08/27/picojs-face-detection/).
 
 ## Usage
 
-An example of using the basic functions of the library:
+An example of using the library's basic functions:
 
 ```js
 // load cascade
@@ -21,12 +21,12 @@ fetch("./data/classifier.dat")
   .then(function (cascade) {
     // create face detector with options
     return PicoFace(cascade, {
-      shiftfactor: 0.1, // move the detection window by 10% of its size
-      scalefactor: 1.1, // resize the detection window by 10% when moving to the higher scale
-      initialsize: 0.1, // minimum size of a face (10% of image area)
-      rotation: [0, 30, 330], // rotation angles in degrees
-      threshold: 0.2, // overlap threshold
-      memory: 3, // number of images in the memory
+      shiftfactor: 0.1, // sliding window step as a fraction of its current size
+      scalefactor: 1.1, // resize the detection window by 10% at each scale level
+      initialsize: 0.1, // minimum face size as a percentage (10%) of image dimensions
+      rotation: [0, 30, 330], // rotation angles to test, in degrees
+      threshold: 0.2, // overlap ratio for merging detected candidates
+      memory: 3, // number of frames kept in memory to improve detection quality
     });
   })
   .then(function (detect) {
@@ -39,37 +39,37 @@ fetch("./data/classifier.dat")
   });
 ```
 
-All parameters of the library are set in the constructor, here is their description:
+All parameters of the library are set in the constructor. Here is their description:
 
 | Parameter   | Default | Description                                                                           |
 | ----------- | ------- | ------------------------------------------------------------------------------------- |
-| shiftfactor | 0.1     | Sliding window movement step as a percentage (10%) of the image size                  |
-| scalefactor | 1.1     | Sliding window resizing step as a percentage (10%) of image size                      |
-| initialsize | 0.1     | Initial size of the sliding window as a percentage (10%) of the image size            |
-| threshold   | 0.2     | Percentage (20%) of intersections of found candidates for grouping them into one area |
-| rotation    | [0]     | Array of rotation angles to be searched (0 to 360 in 1 degree increments)             |
-| memory      | 1       | Number of images (frames) in memory to improve detection quality                      |
+| shiftfactor | 0.1     | Sliding window step as a fraction (10%) of its current size                           |
+| scalefactor | 1.1     | Scale factor for the sliding window (resizes by 10% per step)                         |
+| initialsize | 0.1     | Initial sliding window size as a percentage (10%) of image dimensions                 |
+| threshold   | 0.2     | Overlap ratio (20%) used to merge detected candidates into unified regions            |
+| rotation    | [0]     | Array of rotation angles to test (0–360 degrees)                                     |
+| memory      | 1       | Number of frames kept in memory to improve detection quality                          |
 
-The output is an array of areas where the algorithm assumes there are faces. Here is a description of this area:
+The output is an array of areas where the algorithm detects faces. Here is a description of each area:
 
 | Feature | Description                                                                        |
 | ------- | ---------------------------------------------------------------------------------- |
-| c       | X-coordinate of the center of the found face area                                  |
-| r       | Y-coordinate of the center of the found face area                                  |
-| s       | Size of found area (width and height or diameter)                                  |
-| q       | Detection quality (higher is better quality)                                       |
-| a       | Rotation angle of the image (the most likely one listed in the rotation parameter) |
+| c       | X-coordinate of the center of the detected face                                    |
+| r       | Y-coordinate of the center of the detected face                                    |
+| s       | Size of the detected area (width and height / diameter)                            |
+| q       | Detection quality score (higher is better)                                         |
+| a       | Rotation angle of the image (the most likely one from the `rotation` parameter)    |
 
 ## Build and run
 
-Build the library bundle in the directory `./dist/`:
+Build the library bundle into the `./dist/` directory:
 
 ```
 npm install
 npm run build
 ```
 
-Start the demo webserver:
+Start the demo web server:
 
 ```
 npm run dev
